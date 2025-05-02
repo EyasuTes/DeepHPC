@@ -1,20 +1,39 @@
 # embed.py
 import sys
 import json
+import faiss
+import numpy as np
 from sentence_transformers import SentenceTransformer
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
-
+# Read input
 query = sys.argv[1]
+k = int(sys.argv[2]) if len(sys.argv) > 2 else 5  # Default top_k = 5 //optimze
 
 # Load embedding model
-model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
-vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=model)
+# Load precomputed vectors and texts
+import pickle
+with open("faiss_data.pkl", "rb") as f:
+    data = pickle.load(f)
 
-# Search top 3 matching chunks
-docs = vectorstore.similarity_search(query, k=3)
+texts = data["texts"]
+embeddings = data["embeddings"]
+dimension = embeddings.shape[1]
 
-# Output to stdout for Node.js to capture
-print(json.dumps([doc.page_content for doc in docs]))
+# Build FAISS index
+quantizer = faiss.IndexFlatIP(dimension)
+index = faiss.IndexIVFFlat(quantizer, dimension, 20, faiss.METRIC_INNER_PRODUCT) # Optimized nlist
+index.train(embeddings)
+index.add(embeddings)
+
+# TUNE nprobe here
+index.nprobe = 5  # EXPERIMENT 2: Try different values e.g., 1, 5, 10
+
+# Encode query
+query_vector = model.encode([query], normalize_embeddings=True)
+D, I = index.search(query_vector, k)
+
+# Return top-k matching texts
+results = [texts[i] for i in I[0]]
+print(json.dumps(results))

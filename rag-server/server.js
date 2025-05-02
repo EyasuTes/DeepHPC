@@ -7,17 +7,20 @@ const app = express();
 app.use(express.json());
 
 app.post("/rag", async (req, res) => {
-  const { question } = req.body;
+  const { question, top_k = 5 } = req.body;
 
-const py = spawn("python", ["embed.py", question]);
+  const py = spawn("python", ["embed.py", question, top_k.toString()]);
 
-py.on("error", (err) => {
-  console.error("Failed to start subprocess:", err);
-});
+  py.on("error", (err) => {
+    console.error("Failed to start subprocess:", err);
+  });
 
   let data = "";
 
-  py.stdout.on("data", (chunk) => { data += chunk.toString(); });
+  py.stdout.on("data", (chunk) => {
+    data += chunk.toString();
+  });
+
   py.stderr.on("data", (err) => console.error("Python error:", err.toString()));
 
   py.on("close", async () => {
@@ -27,8 +30,8 @@ py.on("error", (err) => {
 
       const response = await axios.post("http://localhost:11434/api/generate", {
         model: "deepseek-r1:1.5b",
-        prompt: `${context}\n\nQuestion: ${question}\nAnswer:`,
-        stream: false
+        prompt: `You are a factual assistant. Only use the provided context. Do not show reasoning steps, internal thoughts, or anything before the answer. Just give a direct, final answer.\n\nContext:\n${context}\n\nQuestion: ${question}\nAnswer:`,
+        stream: false,
       });
 
       res.json({ answer: response.data.response });
