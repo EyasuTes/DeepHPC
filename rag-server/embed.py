@@ -10,7 +10,7 @@ query = sys.argv[1]
 k = int(sys.argv[2]) if len(sys.argv) > 2 else 5  # Default top_k = 5 //optimze
 
 # Load embedding model
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("all-mpnet-base-v2")
 
 # Load precomputed vectors and texts
 import pickle

@@ -1,0 +1,5 @@
+node_modules/
+package-lock.json/
+fine_tuned_deepseek/
+server2.js/
+\faiss_data.pkl

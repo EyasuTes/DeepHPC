@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 
 # Load model
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("all-mpnet-base-v2")
 splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
 
 # data cleaning before spliting
