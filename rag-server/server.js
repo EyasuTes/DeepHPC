@@ -1,7 +1,5 @@
-// server.js
 const express = require("express");
 const { spawn } = require("child_process");
-const axios = require("axios");
 
 const app = express();
 app.use(express.json());
@@ -9,39 +7,72 @@ app.use(express.json());
 app.post("/rag", async (req, res) => {
   const { question, top_k = 5 } = req.body;
 
-  const py = spawn("python", ["embed.py", question, top_k.toString()]);
+  const embed = spawn("python", ["embed.py", question, top_k.toString()]);
 
-  py.on("error", (err) => {
-    console.error("Failed to start subprocess:", err);
+  let embedData = "";
+  embed.stdout.on("data", (chunk) => {
+    embedData += chunk.toString();
   });
 
-  let data = "";
-
-  py.stdout.on("data", (chunk) => {
-    data += chunk.toString();
+  embed.stderr.on("data", (err) => {
+    console.error("Embed Python error:", err.toString());
   });
-
-  py.stderr.on("data", (err) => console.error("Python error:", err.toString()));
-
-  py.on("close", async () => {
+  console.log("Embed Python er");
+  embed.on("close", () => {
     try {
-      const contextChunks = JSON.parse(data);
+      const contextChunks = JSON.parse(embedData);
       const context = contextChunks.join("\n\n");
+      console.log("Embed Python e2r");
+      const generate = spawn("python", ["generate.py", question, context]);
 
-      const response = await axios.post("http://localhost:11434/api/generate", {
-        model: "deepseek-r1:1.5b",
-        prompt: `You are a factual assistant. Only use the provided context. Do not show reasoning steps, internal thoughts, or anything before the answer. Just give a direct, final answer.\n\nContext:\n${context}\n\nQuestion: ${question}\nAnswer:`,
-        stream: false,
+      let output = "";
+      generate.stdout.on("data", (chunk) => {
+        output += chunk.toString();
       });
+      console.log("Embed Python e3r");
+      generate.stderr.on("data", (err) => {
+        console.error("Generate Python error:", err.toString());
+      });
+      console.log("Embed Python e4r");
+      generate.on("close", () => {
+      try {
+        console.log(output);
 
-      res.json({ answer: response.data.response });
+        // Try to extract the first valid JSON object in the output
+        const firstBrace = output.indexOf('{');
+        const lastBrace = output.lastIndexOf('}');
+
+        if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
+          const jsonString = output.slice(firstBrace, lastBrace + 1);
+
+          try {
+            // Sanitize the JSON string if needed
+            const cleaned = jsonString.replace(/[\x00-\x1F\x7F]/g, "");  // remove control characters
+            const parsed = JSON.parse(cleaned);
+
+            const answerText = parsed["DeepSeek Answer"] || parsed.answer || parsed.response;
+            res.json({ answer: answerText });
+          } catch (e) {
+            console.error("JSON parse error:", e);
+            res.status(500).json({ error: "Failed to parse JSON block" });
+          }
+        } else {
+          res.status(500).json({ error: "Could not locate valid JSON block" });
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+        res.status(500).json({ error: "Unexpected error occurred" });
+      }
+
+         
+      });
     } catch (err) {
-      console.error("Error:", err);
-      res.status(500).json({ error: "Something went wrong." });
+      console.error("Embed parse error:", err);
+      res.status(500).json({ error: "Failed to parse context." });
     }
   });
 });
 
 app.listen(3000, () => {
-  console.log("🔊 RAG backend running on http://localhost:3000");
+  console.log("🔊 Local RAG backend running on http://localhost:3000");
 });

@@ -1,0 +1,15 @@
+1. review some work.
+2. define a hyperparameter grid
+3. create questions for the combination of grids to answer.
+3. test all combinations and log all the results of the tests. accuracy, speed, resource consumption
+4. visualization
+
+| **Parameter**            | **Values**                                                                          | **Notes**                                           |
+| ------------------------ | ----------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Embedding Model**      | `all-MiniLM-L6-v2`, `all-MiniLM-L12-v2`, `BAAI/bge-small-en`, `intfloat/e5-base-v2` | Tradeoff between accuracy and speed                 |
+| **nlist**                | `10`, `20`, `50`, `100`                                                             | More clusters → faster search but requires training |
+| **nprobe**               | `1`, `5`, `10`, `20`                                                                | Higher = more accurate but slower                   |
+| **top\_k**               | `3`, `5`, `10`, `15`                                                                | Affects LLM answer quality and latency              |
+| **chunk\_size**          | `300`, `500`, `700`                                                                 | Smaller chunks = more context variety               |
+| **chunk\_overlap**       | `0`, `50`, `100`                                                                    | Helps retain continuity                             |
+| **batch\_size (encode)** | `16`, `32`, `64`                                                                    | GPU-dependent; affects memory and speed             |

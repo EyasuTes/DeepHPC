@@ -7,10 +7,10 @@ from sentence_transformers import SentenceTransformer
 
 # Read input
 query = sys.argv[1]
-k = int(sys.argv[2]) if len(sys.argv) > 2 else 5  # Default top_k = 5 //optimze
+k =  5  # Default top_k = 5 //optimze
 
 # Load embedding model
-model = SentenceTransformer("all-mpnet-base-v2")
+model = SentenceTransformer("all-MiniLM-L6-v2") 
 
 # Load precomputed vectors and texts
 import pickle
@@ -28,7 +28,7 @@ index.train(embeddings)
 index.add(embeddings)
 
 # TUNE nprobe here
-index.nprobe = 5  # EXPERIMENT 2: Try different values e.g., 1, 5, 10
+index.nprobe = 10  # EXPERIMENT 2: Try different values e.g., 1, 5, 10
 
 # Encode query
 query_vector = model.encode([query], normalize_embeddings=True)

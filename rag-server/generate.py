@@ -1,48 +1,61 @@
-print("hello 1")
 import sys
-print("hello 2")
-
+import json
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, AdapterConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-print("hello 3")
+# Ensure the inputs are read properly
+try:
+    question = sys.argv[1]
+    context = sys.argv[2]
+except Exception as e:
+    print(json.dumps({"error": f"Error reading inputs: {str(e)}"}))
+    sys.exit(1)
 
-# Load model and tokenizer
-model_path = "./fine_tuned_deepseek"
-adapter_config = AdapterConfig.load(model_path + "/adapter_config.json")
-# Ensure support for custom/model-specific code
-tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+print(f"Question: {question}")
+print(f"Context: {context}")
 
-print("hello 4 - tokenizer loaded")
+# Define the paths for the model and tokenizer
+model_path = "model-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+tokenizer_path = "tokenizer-deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
 
-model = AutoModelForCausalLM.from_pretrained(
-    model_path,
-    trust_remote_code=True,
-    attn_implementation="sdpa"  # safer default than "eager"
-)
-# print("hello 5 - model loaded")
+# Load the tokenizer and model from the local directory
+try:
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        device_map="auto"
+    )
+except Exception as e:
+    print(json.dumps({"error": f"Error loading model: {str(e)}"}))
+    sys.exit(1)
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# model.to(device)
-# model.eval()
-# print("hello 6 - model moved to", device)
+# Create the prompt with context and the question
+prompt = f"""You are a factual assistant. Only use the provided context. Do not show reasoning steps, internal thoughts, or anything before the answer. Just give a direct, final answer.
 
-# # Get inputs
-# question = sys.argv[1]
-# context = sys.argv[2]
+Context:
+{context}
 
-# prompt = f"{context}\n\nQuestion: {question}\nAnswer:"
-# print("📥 Prompt created")
+Question: {question}
+Answer:"""
 
-# inputs = tokenizer(prompt, return_tensors="pt").to(device)
-# print("📏 Token count:", len(inputs["input_ids"][0]))
+# Tokenize and generate the response
+try:
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=556000,
+        do_sample=False,
+        eos_token_id=tokenizer.eos_token_id
+    )
+    decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-# # Generate response
-# with torch.no_grad():
-#     outputs = model.generate(**inputs, max_new_tokens=150)
+    # Extract the answer from the generated text
+    answer = decoded.split("Answer:")[-1].strip()
 
-# response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # Output the answer as JSON
+    print(json.dumps({"DeepSeek Answer": answer}))
 
-# # Optional: Only print the answer (strip the prompt part if needed)
-# print("✅ Response generated")
-# print(response)
+except Exception as e:
+    print(json.dumps({"error": f"Error during generation: {str(e)}"}))
+    sys.exit(1)
